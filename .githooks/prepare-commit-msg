@@ -1,0 +1,28 @@
+
+#!/bin/bash
+echo "prepare-commit-msg started"
+
+# Get commit message
+COMMIT_MSG_FILE=$1
+
+# Get the current branch name
+BRANCH_NAME=$(git symbolic-ref --short HEAD)
+
+# Extract task number from the branch name (e.g., "MEME-29889")
+TASK_ID=$(echo "$BRANCH_NAME" | grep -oE "MEME-[0-9]+")
+PREFIX=""
+
+if [ -n "$TASK_ID" ]; then
+  PREFIX="${TASK_ID}: "
+fi
+
+# Read original commit message
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Combine task prefix with the original commit message
+NEW_COMMIT_MSG="${PREFIX}${COMMIT_MSG}"
+
+# Update the commit message file
+echo "$NEW_COMMIT_MSG" > "$COMMIT_MSG_FILE"
+
+echo "prepare-commit-msg completed"
