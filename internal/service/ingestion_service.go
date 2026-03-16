@@ -46,7 +46,7 @@ func (s *IngestionService) FetchAndProcess() error {
 
 	if collected < fetchMemesCount {
 		return fmt.Errorf(
-			"Failed to collect enough memes: got %d/%d after %d attempts",
+			"failed to collect enough memes: got %d/%d after %d attempts",
 			collected,
 			fetchMemesCount,
 			attempts,

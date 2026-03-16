@@ -6,7 +6,8 @@ type repository interface {
 	Save(meme entity.Meme) error
 	ExistsByHash(hash string) (bool, error)
 	GetByStatus(status entity.MemeStatus) ([]entity.Meme, error)
-	UpdateStatus(ID string, status entity.MemeStatus)
+	UpdateStatus(ID string, status entity.MemeStatus) error
+	GetOldestApproved() (entity.Meme, error)
 }
 
 type source interface {
