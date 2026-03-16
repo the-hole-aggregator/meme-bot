@@ -20,8 +20,8 @@ const (
 type Meme struct {
 	ID        string
 	Hash      string
+	Status    MemeStatus
 	Source    Source
 	SourceID  string
-	Status    MemeStatus
 	CreatedAt time.Time
 }
