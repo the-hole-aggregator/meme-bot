@@ -5,7 +5,8 @@ import "meme-bot/internal/entity"
 type repository interface {
 	Save(meme entity.Meme) error
 	ExistsByHash(hash string) (bool, error)
-	GetByStatus(status entity.MemeStatus) ([]entity.MemeStatus, error)
+	GetByStatus(status entity.MemeStatus) ([]entity.Meme, error)
+	UpdateStatus(ID string, status entity.MemeStatus)
 }
 
 type source interface {
@@ -14,4 +15,8 @@ type source interface {
 
 type publisher interface {
 	Publish(meme entity.Meme) error
+}
+
+type moderationAPI interface {
+	Moderate(meme entity.Meme) error
 }
