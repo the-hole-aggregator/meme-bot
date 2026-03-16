@@ -6,7 +6,11 @@ GIT_HOOKS_INIT := $(SCRIPTS_DIR)/git_hooks_init.sh
 # Tasks to run each script
 hooks_init:
 	sh $(GIT_HOOKS_INIT)
+	
+lint:
+	golangci-lint run
 
 	
 help:
 	@echo " - hooks_init: init git hooks"
+	@echo " - lint: run linter checks"
