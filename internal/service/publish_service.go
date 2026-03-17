@@ -34,7 +34,7 @@ func (p *PublishService) Publish() error {
 		err := fmt.Errorf("publish errors: %v", publishErrors)
 		p.logger.Error(err.Error())
 
-		if len(publishErrors) == 3 {
+		if len(publishErrors) == len(p.publishers) {
 			return err
 		}
 	}
