@@ -3,25 +3,26 @@ package service
 import (
 	"fmt"
 	"log/slog"
-	"meme-bot/internal/entity"
+	"meme-bot/internal/domain"
+	"meme-bot/internal/ports"
 )
 
 const maxAttempts = 50
 
-type IngestionService struct {
-	repository repository
-	sources    []source
+type IngestionUseCase struct {
+	repository ports.Repository
+	sources    []ports.Source
 	logger     slog.Logger
 }
 
-func NewIngestionService(repository repository, sources []source) *IngestionService {
-	return &IngestionService{
+func NewIngestionUseCase(repository ports.Repository, sources []ports.Source) *IngestionUseCase {
+	return &IngestionUseCase{
 		repository: repository,
 		sources:    sources,
 	}
 }
 
-func (s *IngestionService) FetchAndProcess(limit int) error {
+func (s *IngestionUseCase) Call(limit int) error {
 	if len(s.sources) == 0 {
 		return fmt.Errorf("no sources configured")
 	}
@@ -61,7 +62,7 @@ func (s *IngestionService) FetchAndProcess(limit int) error {
 	return nil
 }
 
-func (s *IngestionService) validate(meme entity.Meme) bool {
+func (s *IngestionUseCase) validate(meme domain.Meme) bool {
 	exists, err := s.repository.ExistsByHash(meme.Hash)
 	if err != nil {
 		return false
