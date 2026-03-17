@@ -2,36 +2,41 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 	"meme-bot/internal/entity"
 )
 
-// Memes count to fetch.
-// 2 for each weekday
-const (
-	fetchMemesCount = 14
-	maxAttempts     = 50
-)
+const maxAttempts = 50
 
 type IngestionService struct {
 	repository repository
 	sources    []source
+	logger     slog.Logger
 }
 
 func NewIngestionService(repository repository, sources []source) *IngestionService {
-	return &IngestionService{repository: repository, sources: sources}
+	return &IngestionService{
+		repository: repository,
+		sources:    sources,
+	}
 }
 
-func (s *IngestionService) FetchAndProcess() error {
+func (s *IngestionService) FetchAndProcess(limit int) error {
+	if len(s.sources) == 0 {
+		return fmt.Errorf("no sources configured")
+	}
+
 	collected := 0
 	attempts := 0
 
-	for collected < fetchMemesCount && attempts < maxAttempts {
+	for attempts < maxAttempts && collected < limit {
 		attempts++
 
 		source := s.sources[attempts%len(s.sources)]
 
 		meme, err := source.FetchMeme()
 		if err != nil {
+			s.logger.Error(fmt.Errorf("fetch error: %s", err).Error())
 			continue
 		}
 
@@ -40,17 +45,17 @@ func (s *IngestionService) FetchAndProcess() error {
 		}
 
 		if err := s.repository.Save(meme); err != nil {
+			s.logger.Error(fmt.Errorf("save error: %s", err).Error())
 			continue
 		}
+
+		collected++
 	}
 
-	if collected < fetchMemesCount {
-		return fmt.Errorf(
-			"failed to collect enough memes: got %d/%d after %d attempts",
-			collected,
-			fetchMemesCount,
-			attempts,
-		)
+	s.logger.Error(fmt.Errorf("ingestion finished: collected=%d attempts=%d", collected, attempts).Error())
+
+	if collected == 0 {
+		return fmt.Errorf("no memes collected after %d attempts", attempts)
 	}
 
 	return nil
@@ -62,5 +67,5 @@ func (s *IngestionService) validate(meme entity.Meme) bool {
 		return false
 	}
 
-	return exists
+	return !exists
 }
