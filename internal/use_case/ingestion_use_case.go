@@ -63,7 +63,7 @@ func (s *IngestionUseCase) Call(limit int) error {
 }
 
 func (s *IngestionUseCase) validate(meme domain.Meme) bool {
-	exists, err := s.repository.ExistsByHash(meme.Hash)
+	exists, err := s.repository.ExistsByHash(meme.PHash)
 	if err != nil {
 		return false
 	}
