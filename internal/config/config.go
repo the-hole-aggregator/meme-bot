@@ -11,6 +11,8 @@ import (
 )
 
 type Config struct {
+	PHONE       string
+	PASSWORD    string
 	TG_API_ID   int
 	TG_API_HASH string
 }
@@ -18,10 +20,14 @@ type Config struct {
 func NewConfig() (cfg *Config, err error) {
 	err = godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal("Error loading .env file ", err)
 	}
 
 	cfg = &Config{}
+
+	cfg.PHONE = os.Getenv("PHONE_NUMBER")
+
+	cfg.PASSWORD = os.Getenv("PASSWORD")
 
 	cfg.TG_API_ID, err = getEnvAsInt("TG_API_ID")
 	if err != nil {
@@ -45,6 +51,14 @@ func (c *Config) validate() error {
 
 	if c.TG_API_HASH == "" {
 		return errors.New("TG_API_HASH is required")
+	}
+
+	if c.PHONE == "" {
+		return errors.New("PHONE_NUMBER is required")
+	}
+
+	if c.PASSWORD == "" {
+		return errors.New("PASSWORD is required")
 	}
 
 	return nil

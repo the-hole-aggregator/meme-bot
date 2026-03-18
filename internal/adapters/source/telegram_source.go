@@ -40,7 +40,7 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 			Username: s.channel,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to resolve user name %s", err)
 		}
 
 		ch, ok := resolved.Chats[0].(*tg.Channel)
@@ -129,18 +129,27 @@ func (s *TelegramSource) downloadPhoto(
 		return "", fmt.Errorf("invalid photo")
 	}
 
-	var best *tg.PhotoSize
+	var bestType string
+	maxSize := 0
 
 	for _, size := range photo.Sizes {
-		if s, ok := size.(*tg.PhotoSize); ok {
-			if best == nil || s.Size > best.Size {
-				best = s
+		switch s := size.(type) {
+
+		case *tg.PhotoSize:
+			if s.Size > maxSize {
+				maxSize = s.Size
+				bestType = s.Type
+			}
+
+		case *tg.PhotoSizeProgressive:
+			if len(s.Sizes) > 0 {
+				last := s.Sizes[len(s.Sizes)-1]
+				if last > maxSize {
+					maxSize = last
+					bestType = s.Type
+				}
 			}
 		}
-	}
-
-	if best == nil {
-		return "", fmt.Errorf("no photo sizes")
 	}
 
 	filePath := fmt.Sprintf("tmp/%d.jpg", msg.ID)
@@ -157,7 +166,7 @@ func (s *TelegramSource) downloadPhoto(
 		ID:            photo.ID,
 		AccessHash:    photo.AccessHash,
 		FileReference: photo.FileReference,
-		ThumbSize:     best.Type, // 👈 ключевой момент
+		ThumbSize:     bestType,
 	}
 
 	builder := d.Download(api, location)
