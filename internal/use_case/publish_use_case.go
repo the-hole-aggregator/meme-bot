@@ -1,22 +1,23 @@
-package service
+package usecase
 
 import (
 	"fmt"
 	"log/slog"
-	"meme-bot/internal/entity"
+	"meme-bot/internal/domain"
+	"meme-bot/internal/ports"
 )
 
-type PublishService struct {
-	publishers []publisher
-	repository repository
+type PublishUseCase struct {
+	publishers []ports.Publisher
+	repository ports.Repository
 	logger     slog.Logger
 }
 
-func NewPublisherService(publishers []publisher, repository repository) *PublishService {
-	return &PublishService{publishers: publishers, repository: repository}
+func NewPublisherUseCase(publishers []ports.Publisher, repository ports.Repository) *PublishUseCase {
+	return &PublishUseCase{publishers: publishers, repository: repository}
 }
 
-func (p *PublishService) Publish() error {
+func (p *PublishUseCase) Call() error {
 	meme, err := p.repository.GetOldestApproved()
 	if err != nil {
 		return err
@@ -39,5 +40,5 @@ func (p *PublishService) Publish() error {
 		}
 	}
 
-	return p.repository.UpdateStatus(meme.ID, entity.Posted)
+	return p.repository.UpdateStatus(meme.ID, domain.Posted)
 }

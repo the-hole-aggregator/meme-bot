@@ -1,4 +1,4 @@
-package entity
+package domain
 
 import "time"
 
@@ -18,8 +18,8 @@ const (
 )
 
 type Meme struct {
-	ID        string
-	Hash      string
+	ID        int
+	PHash     string
 	Status    MemeStatus
 	Source    Source
 	SourceID  string
