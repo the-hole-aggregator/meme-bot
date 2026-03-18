@@ -39,7 +39,10 @@ func main() {
 				auth.CodeAuthenticatorFunc(func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 					var code string
 					fmt.Print("Enter code: ")
-					fmt.Scanln(&code)
+					_, err := fmt.Scanln(&code)
+					if err != nil {
+						return "", err
+					}
 					return code, nil
 				}),
 			),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"time"
@@ -91,7 +92,12 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 
 		hash, err := util.ComputePHash(filePath)
 		if err != nil {
-			os.Remove(filePath)
+
+			fileErr := os.Remove(filePath)
+			if fileErr != nil {
+				return fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
+			}
+
 			return err
 		}
 
@@ -158,7 +164,13 @@ func (s *TelegramSource) downloadPhoto(
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			log.Print("error on closing file ", err)
+		}
+
+	}()
 
 	d := downloader.NewDownloader()
 
