@@ -5,7 +5,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-// ComputePHash вычисляет перцептивный хэш изображения
+// ComputePHash computes the perceptual hash of an image
 func ComputePHash(filePath string) (*goimagehash.ImageHash, error) {
 	img, err := imaging.Open(filePath)
 	if err != nil {
@@ -20,7 +20,7 @@ func ComputePHash(filePath string) (*goimagehash.ImageHash, error) {
 	return phash, nil
 }
 
-// ComparePHash возвращает true, если изображения похожи (threshold = 5 бит)
+// ComparePHash returns true if the images are similar (threshold = 5 bits)
 func ComparePHash(h1, h2 *goimagehash.ImageHash) (bool, error) {
 	distance, err := h1.Distance(h2)
 	if err != nil {
