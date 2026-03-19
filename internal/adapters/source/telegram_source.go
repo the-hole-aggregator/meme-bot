@@ -27,93 +27,85 @@ func NewTelegramSource(client *telegram.Client, channel string) *TelegramSource 
 	return &TelegramSource{
 		client:  client,
 		channel: channel,
-		limit:   50,
+		limit:   100,
 	}
 }
 
 func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 	var result *domain.Meme
 
-	err := s.client.Run(ctx, func(ctx context.Context) error {
-		api := s.client.API()
+	api := s.client.API()
 
-		resolved, err := api.ContactsResolveUsername(ctx, &tg.ContactsResolveUsernameRequest{
-			Username: s.channel,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to resolve user name %s", err)
-		}
-
-		ch, ok := resolved.Chats[0].(*tg.Channel)
-		if !ok {
-			return errors.New("not a channel")
-		}
-
-		history, err := api.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
-			Peer: &tg.InputPeerChannel{
-				ChannelID:  ch.ID,
-				AccessHash: ch.AccessHash,
-			},
-			Limit: s.limit,
-		})
-		if err != nil {
-			return err
-		}
-
-		historyMessages, ok := history.AsModified()
-		if !ok {
-			return fmt.Errorf("can't map history messages")
-		}
-
-		var mediaMessages []*tg.Message
-
-		for _, msg := range historyMessages.GetMessages() {
-			m, ok := msg.(*tg.Message)
-			if !ok {
-				continue
-			}
-
-			if m.Media != nil {
-				mediaMessages = append(mediaMessages, m)
-			}
-		}
-
-		if len(mediaMessages) == 0 {
-			return errors.New("no media found")
-		}
-
-		rand.NewSource(time.Now().UnixNano())
-		m := mediaMessages[rand.Intn(len(mediaMessages))]
-
-		filePath, err := s.downloadPhoto(ctx, api, m)
-		if err != nil {
-			return err
-		}
-
-		hash, err := util.ComputePHash(filePath)
-		if err != nil {
-
-			fileErr := os.Remove(filePath)
-			if fileErr != nil {
-				return fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
-			}
-
-			return err
-		}
-
-		result = &domain.Meme{
-			PHash:     hash.ToString(),
-			Status:    domain.Pending,
-			Source:    domain.Telegram,
-			SourceID:  fmt.Sprintf("%d", m.ID),
-			CreatedAt: time.Now(),
-		}
-
-		return nil
+	resolved, err := api.ContactsResolveUsername(ctx, &tg.ContactsResolveUsernameRequest{
+		Username: s.channel,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve user name %s", err)
+	}
 
+	tgChan, ok := resolved.Chats[0].(*tg.Channel)
+	if !ok {
+		return nil, errors.New("not a channel")
+	}
+
+	history, err := api.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+		Peer: &tg.InputPeerChannel{
+			ChannelID:  tgChan.ID,
+			AccessHash: tgChan.AccessHash,
+		},
+		Limit: s.limit,
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	historyMessages, ok := history.AsModified()
+	if !ok {
+		return nil, fmt.Errorf("can't map history messages")
+	}
+
+	var mediaMessages []*tg.Message
+
+	for _, msg := range historyMessages.GetMessages() {
+		m, ok := msg.(*tg.Message)
+		if !ok {
+			continue
+		}
+
+		if m.Media != nil {
+			mediaMessages = append(mediaMessages, m)
+		}
+	}
+
+	if len(mediaMessages) == 0 {
+		return nil, errors.New("no media found")
+	}
+
+	rand.NewSource(time.Now().UnixNano())
+	m := mediaMessages[rand.Intn(len(mediaMessages))]
+
+	filePath, err := s.downloadPhoto(ctx, api, m)
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := util.ComputePHash(filePath)
+	if err != nil {
+
+		fileErr := os.Remove(filePath)
+		if fileErr != nil {
+			return nil, fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
+		}
+
+		return nil, err
+	}
+
+	result = &domain.Meme{
+		PHash:     hash.ToString(),
+		Status:    domain.Pending,
+		Source:    domain.Telegram,
+		SourceID:  fmt.Sprintf("%d", m.ID),
+		CreatedAt: time.Now(),
 	}
 
 	return result, nil
