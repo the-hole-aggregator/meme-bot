@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"meme-bot/internal/adapters/source/downloader"
 	"meme-bot/internal/domain"
+	"meme-bot/internal/ports"
 	"meme-bot/internal/util"
 	"net/http"
 	"os"
@@ -33,7 +34,7 @@ func NewRssSource(
 	rand *rand.Rand,
 	client *http.Client,
 	hasher util.Hasher,
-) *RssSource {
+) ports.Source {
 	return &RssSource{
 		url:    url,
 		parser: parser,

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"meme-bot/internal/domain"
+	"meme-bot/internal/ports"
 	"meme-bot/internal/util"
 
 	tgdownloader "meme-bot/internal/adapters/source/downloader"
@@ -32,7 +33,7 @@ func NewTelegramSource(
 	hasher util.Hasher,
 	df tgdownloader.DownloaderFactory,
 	rand *rand.Rand,
-) *TelegramSource {
+) ports.Source {
 	return &TelegramSource{
 		client:  client,
 		channel: channel,
