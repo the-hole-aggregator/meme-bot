@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"time"
@@ -12,8 +11,9 @@ import (
 	"meme-bot/internal/domain"
 	"meme-bot/internal/util"
 
+	tgdownloader "meme-bot/internal/adapters/source/downloader"
+
 	"github.com/gotd/td/telegram"
-	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
 )
 
@@ -21,19 +21,29 @@ type TelegramSource struct {
 	client  *telegram.Client
 	channel string
 	limit   int
+	hasher  util.Hasher
+	df      tgdownloader.DownloaderFactory
+	rand    *rand.Rand
 }
 
-func NewTelegramSource(client *telegram.Client, channel string) *TelegramSource {
+func NewTelegramSource(
+	client *telegram.Client,
+	channel string,
+	hasher util.Hasher,
+	df tgdownloader.DownloaderFactory,
+	rand *rand.Rand,
+) *TelegramSource {
 	return &TelegramSource{
 		client:  client,
 		channel: channel,
 		limit:   100,
+		hasher:  hasher,
+		df:      df,
+		rand:    rand,
 	}
 }
 
 func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
-	var result *domain.Meme
-
 	api := s.client.API()
 
 	resolved, err := api.ContactsResolveUsername(ctx, &tg.ContactsResolveUsernameRequest{
@@ -81,15 +91,15 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 		return nil, errors.New("no media found")
 	}
 
-	rand.NewSource(time.Now().UnixNano())
 	m := mediaMessages[rand.Intn(len(mediaMessages))]
+	filePath := fmt.Sprintf("tmp/%d.jpg", m.ID)
 
-	filePath, err := s.downloadPhoto(ctx, api, m)
-	if err != nil {
+	imageDownloader := s.df.FromTelegram(ctx, api, m)
+	if err := imageDownloader.DownloadImage(filePath); err != nil {
 		return nil, err
 	}
 
-	hash, err := util.ComputePHash(filePath)
+	hash, err := s.hasher.ComputePHash(filePath)
 	if err != nil {
 
 		fileErr := os.Remove(filePath)
@@ -100,8 +110,8 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 		return nil, err
 	}
 
-	result = &domain.Meme{
-		PHash:     hash.ToString(),
+	result := &domain.Meme{
+		PHash:     hash,
 		Status:    domain.Pending,
 		Source:    domain.Telegram,
 		SourceID:  fmt.Sprintf("%d", m.ID),
@@ -109,76 +119,4 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 	}
 
 	return result, nil
-}
-
-func (s *TelegramSource) downloadPhoto(
-	ctx context.Context,
-	api *tg.Client,
-	msg *tg.Message,
-) (string, error) {
-
-	media, ok := msg.Media.(*tg.MessageMediaPhoto)
-	if !ok {
-		return "", fmt.Errorf("not a photo")
-	}
-
-	photo, ok := media.Photo.(*tg.Photo)
-	if !ok {
-		return "", fmt.Errorf("invalid photo")
-	}
-
-	var bestType string
-	maxSize := 0
-
-	for _, size := range photo.Sizes {
-		switch s := size.(type) {
-
-		case *tg.PhotoSize:
-			if s.Size > maxSize {
-				maxSize = s.Size
-				bestType = s.Type
-			}
-
-		case *tg.PhotoSizeProgressive:
-			if len(s.Sizes) > 0 {
-				last := s.Sizes[len(s.Sizes)-1]
-				if last > maxSize {
-					maxSize = last
-					bestType = s.Type
-				}
-			}
-		}
-	}
-
-	filePath := fmt.Sprintf("tmp/%d.jpg", msg.ID)
-
-	file, err := os.Create(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		err := file.Close()
-		if err != nil {
-			log.Print("error on closing file ", err)
-		}
-
-	}()
-
-	d := downloader.NewDownloader()
-
-	location := &tg.InputPhotoFileLocation{
-		ID:            photo.ID,
-		AccessHash:    photo.AccessHash,
-		FileReference: photo.FileReference,
-		ThumbSize:     bestType,
-	}
-
-	builder := d.Download(api, location)
-
-	_, err = builder.ToPath(ctx, filePath)
-	if err != nil {
-		return "", err
-	}
-
-	return filePath, nil
 }
