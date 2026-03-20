@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"meme-bot/internal/domain"
@@ -22,7 +23,7 @@ func NewIngestionUseCase(repository ports.Repository, sources []ports.Source) *I
 	}
 }
 
-func (s *IngestionUseCase) Call(limit int) error {
+func (s *IngestionUseCase) Call(ctx context.Context, limit int) error {
 	if len(s.sources) == 0 {
 		return fmt.Errorf("no sources configured")
 	}
@@ -35,7 +36,7 @@ func (s *IngestionUseCase) Call(limit int) error {
 
 		source := s.sources[attempts%len(s.sources)]
 
-		meme, err := source.FetchMeme()
+		meme, err := source.FetchMeme(ctx)
 		if err != nil {
 			s.logger.Error(fmt.Errorf("fetch error: %s", err).Error())
 			continue
@@ -62,7 +63,7 @@ func (s *IngestionUseCase) Call(limit int) error {
 	return nil
 }
 
-func (s *IngestionUseCase) validate(meme domain.Meme) bool {
+func (s *IngestionUseCase) validate(meme *domain.Meme) bool {
 	exists, err := s.repository.ExistsByHash(meme.PHash)
 	if err != nil {
 		return false
