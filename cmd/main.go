@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"meme-bot/internal/adapters/source"
+	"meme-bot/internal/adapters/source/downloader"
 	"meme-bot/internal/config"
+	"meme-bot/internal/util"
+	"net/http"
 	"time"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
+	"github.com/mmcdole/gofeed"
 )
 
 func main() {
@@ -55,9 +60,26 @@ func main() {
 
 		log.Println("✅ Authorized")
 
-		tgSource := source.NewTelegramSource(client, "tupi4ek_degradanta")
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		hasher := util.ImagePHasher{}
+		downloaderFactory := downloader.DefaultDownloaderFactory{}
+		feedParser := gofeed.NewParser()
+		// tgSource := source.NewTelegramSource(client, "git_rebase", hasher, downloaderFactory, r)
 
-		meme, err := tgSource.FetchMeme(ctx)
+		// meme, err := tgSource.FetchMeme(ctx)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to fetch meme: %w", err)
+		// }
+		rssSource := source.NewRssSource(
+			cfg.RSS_SOURCES[2],
+			feedParser,
+			downloaderFactory,
+			r,
+			http.DefaultClient,
+			hasher,
+		)
+
+		meme, err := rssSource.FetchMeme(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to fetch meme: %w", err)
 		}
