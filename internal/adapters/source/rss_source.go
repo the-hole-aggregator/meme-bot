@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"meme-bot/internal/adapters/source/downloader"
 	"meme-bot/internal/domain"
+	"meme-bot/internal/ports"
 	"meme-bot/internal/util"
 	"net/http"
 	"os"
@@ -33,7 +34,7 @@ func NewRssSource(
 	rand *rand.Rand,
 	client *http.Client,
 	hasher util.Hasher,
-) *RssSource {
+) ports.Source {
 	return &RssSource{
 		url:    url,
 		parser: parser,
@@ -44,15 +45,15 @@ func NewRssSource(
 	}
 }
 
-func (s *RssSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
+func (s *RssSource) FetchMeme(ctx context.Context) (*domain.Meme, string, error) {
 	feed, err := s.parser.ParseURLWithContext(s.url, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse rss url %s", err)
+		return nil, "", fmt.Errorf("failed to parse rss url %s", err)
 	}
 
 	filtered := util.Filter(feed.Items, hasImage)
 	if len(filtered) == 0 {
-		return nil, errors.New("there are not any items with image")
+		return nil, "", errors.New("there are not any items with image")
 	}
 
 	item := filtered[s.rand.Intn(len(filtered))]
@@ -61,12 +62,12 @@ func (s *RssSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 
 	imgURL := extractImage(item)
 	if imgURL == "" {
-		return nil, errors.New("image url can't be empty")
+		return nil, "", errors.New("image url can't be empty")
 	}
 
 	imageDownloader := s.df.FromURL(ctx, imgURL, s.client)
 	if err := imageDownloader.DownloadImage(filePath); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	hash, err := s.hasher.ComputePHash(filePath)
@@ -74,10 +75,10 @@ func (s *RssSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 
 		fileErr := os.Remove(filePath)
 		if fileErr != nil {
-			return nil, fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
+			return nil, "", fmt.Errorf("failed on removing image file: %s %s", err, fileErr)
 		}
 
-		return nil, err
+		return nil, "", err
 	}
 
 	result := &domain.Meme{
@@ -88,7 +89,7 @@ func (s *RssSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 		CreatedAt: time.Now(),
 	}
 
-	return result, nil
+	return result, filePath, nil
 }
 
 var imgRe = regexp.MustCompile(`src="([^"]+)"`)

@@ -29,3 +29,6 @@ go.work.sum
 
 # session file
 session.json
+
+# Temp folder files
+tmp/

@@ -4,18 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"math/rand"
+	"meme-bot/internal/adapters/repository"
 	"meme-bot/internal/adapters/source"
 	"meme-bot/internal/adapters/source/downloader"
 	"meme-bot/internal/config"
+	"meme-bot/internal/ports"
+	usecase "meme-bot/internal/use_case"
 	"meme-bot/internal/util"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -30,11 +36,9 @@ func main() {
 	sessionStorage := &session.FileStorage{
 		Path: "session.json",
 	}
-
 	client := telegram.NewClient(cfg.TG_API_ID, cfg.TG_API_HASH, telegram.Options{
 		SessionStorage: sessionStorage,
 	})
-
 	err = client.Run(ctx, func(ctx context.Context) error {
 
 		flow := auth.NewFlow(
@@ -60,31 +64,24 @@ func main() {
 
 		log.Println("✅ Authorized")
 
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		hasher := util.ImagePHasher{}
-		downloaderFactory := downloader.DefaultDownloaderFactory{}
-		feedParser := gofeed.NewParser()
-		// tgSource := source.NewTelegramSource(client, "git_rebase", hasher, downloaderFactory, r)
+		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-		// meme, err := tgSource.FetchMeme(ctx)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to fetch meme: %w", err)
-		// }
-		rssSource := source.NewRssSource(
-			cfg.RSS_SOURCES[2],
-			feedParser,
-			downloaderFactory,
-			r,
-			http.DefaultClient,
-			hasher,
+		pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+		if err != nil {
+			log.Fatal("db hasn't been initialized")
+		}
+		repository := repository.NewPostgresRepository(pool)
+		sources := createSources(cfg, client)
+
+		ingestionUseCase := usecase.NewIngestionUseCase(
+			repository,
+			sources,
+			logger,
 		)
 
-		meme, err := rssSource.FetchMeme(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to fetch meme: %w", err)
+		if err := ingestionUseCase.Call(ctx, 14); err != nil {
+			log.Fatalf("failed on fetching memes %s", err)
 		}
-
-		log.Printf("🎉 Meme fetched: %+v\n", meme)
 
 		// TODO(egrischenkov): change to scheduler
 		for {
@@ -96,4 +93,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func createSources(cfg *config.Config, client *telegram.Client) []ports.Source {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	hasher := util.ImagePHasher{}
+	downloaderFactory := downloader.DefaultDownloaderFactory{}
+	feedParser := gofeed.NewParser()
+
+	sources := make([]ports.Source, 0)
+
+	for _, src := range cfg.TG_SOURCES {
+		tgSource := source.NewTelegramSource(client, src, hasher, downloaderFactory, r)
+		sources = append(sources, tgSource)
+	}
+
+	for _, src := range cfg.RSS_SOURCES {
+		rssSource := source.NewRssSource(
+			src,
+			feedParser,
+			downloaderFactory,
+			r,
+			http.DefaultClient,
+			hasher,
+		)
+		sources = append(sources, rssSource)
+	}
+
+	return sources
 }
