@@ -44,19 +44,19 @@ func NewTelegramSource(
 	}
 }
 
-func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
+func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, string, error) {
 	api := s.client.API()
 
 	resolved, err := api.ContactsResolveUsername(ctx, &tg.ContactsResolveUsernameRequest{
 		Username: s.channel,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve user name %s", err)
+		return nil, "", fmt.Errorf("failed to resolve user name %s", err)
 	}
 
 	tgChan, ok := resolved.Chats[0].(*tg.Channel)
 	if !ok {
-		return nil, errors.New("not a channel")
+		return nil, "", errors.New("not a channel")
 	}
 
 	history, err := api.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
@@ -67,12 +67,12 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 		Limit: s.limit,
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	historyMessages, ok := history.AsModified()
 	if !ok {
-		return nil, fmt.Errorf("can't map history messages")
+		return nil, "", fmt.Errorf("can't map history messages")
 	}
 
 	var mediaMessages []*tg.Message
@@ -89,7 +89,7 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 	}
 
 	if len(mediaMessages) == 0 {
-		return nil, errors.New("no media found")
+		return nil, "", errors.New("no media found")
 	}
 
 	m := mediaMessages[rand.Intn(len(mediaMessages))]
@@ -97,7 +97,7 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 
 	imageDownloader := s.df.FromTelegram(ctx, api, m)
 	if err := imageDownloader.DownloadImage(filePath); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	hash, err := s.hasher.ComputePHash(filePath)
@@ -105,10 +105,10 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 
 		fileErr := os.Remove(filePath)
 		if fileErr != nil {
-			return nil, fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
+			return nil, "", fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
 		}
 
-		return nil, err
+		return nil, "", err
 	}
 
 	result := &domain.Meme{
@@ -119,5 +119,5 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, error) {
 		CreatedAt: time.Now(),
 	}
 
-	return result, nil
+	return result, filePath, nil
 }

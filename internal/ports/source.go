@@ -6,5 +6,5 @@ import (
 )
 
 type Source interface {
-	FetchMeme(ctx context.Context) (*domain.Meme, error)
+	FetchMeme(ctx context.Context) (*domain.Meme, string, error)
 }
