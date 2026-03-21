@@ -105,7 +105,7 @@ func (s *TelegramSource) FetchMeme(ctx context.Context) (*domain.Meme, string, e
 
 		fileErr := os.Remove(filePath)
 		if fileErr != nil {
-			return nil, "", fmt.Errorf("failed on computing hash: %s %s", err, fileErr)
+			return nil, "", fmt.Errorf("failed on removing image file: %s %s", err, fileErr)
 		}
 
 		return nil, "", err

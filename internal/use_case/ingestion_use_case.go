@@ -51,13 +51,20 @@ func (s *IngestionUseCase) Call(ctx context.Context, limit int) error {
 		}
 
 		if !s.validate(meme, filePath) {
-			os.Remove(filePath)
+			err := os.Remove(filePath)
+			if err != nil {
+				s.logger.Error("failed on removing image file")
+			}
+
 			continue
 		}
 
 		if err := s.repository.Save(meme); err != nil {
 			s.logger.Error(fmt.Errorf("save error: %s", err).Error())
-			os.Remove(filePath)
+			err := os.Remove(filePath)
+			if err != nil {
+				s.logger.Error("failed on removing image file")
+			}
 			continue
 		}
 
@@ -74,7 +81,7 @@ func (s *IngestionUseCase) Call(ctx context.Context, limit int) error {
 }
 
 func (s *IngestionUseCase) validate(meme *domain.Meme, filePath string) bool {
-	if !isValidImage(filePath) {
+	if !isValidImage(filePath, s.logger) {
 		s.logger.Error("image isn't valid")
 		return false
 	}
@@ -93,12 +100,16 @@ func (s *IngestionUseCase) validate(meme *domain.Meme, filePath string) bool {
 	return !exists
 }
 
-func isValidImage(path string) bool {
+func isValidImage(path string, logger *slog.Logger) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Warn(fmt.Errorf("failed on close file: %s", err).Error())
+		}
+	}()
 
 	_, _, err = image.Decode(f)
 	return err == nil

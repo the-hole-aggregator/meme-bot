@@ -33,7 +33,7 @@ func (r *PostgresRepository) Save(m *domain.Meme) error {
 	).Scan(&m.ID, &m.CreatedAt)
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
