@@ -25,8 +25,8 @@ dev-down:
 	pkill -f "go run cmd/main.go"
 	
 remove-db:
-	docker compose down -v
 	migrate -path migrations -database $(DATABASE_URL) down
+	docker compose down -v
 	
 	
 help:
