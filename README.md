@@ -33,7 +33,7 @@ The project architecture is fully structured around Clean Architecture with clea
 1. **Configure git hooks**:
 
    ```bash
-   make hooks_init
+   make hooks-init
    ```
 
 ---
