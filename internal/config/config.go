@@ -12,12 +12,13 @@ import (
 )
 
 type Config struct {
-	PHONE       string
-	PASSWORD    string
-	TG_API_ID   int
-	TG_API_HASH string
-	TG_SOURCES  []string
-	RSS_SOURCES []string
+	PHONE        string
+	PASSWORD     string
+	TG_API_ID    int
+	TG_API_HASH  string
+	TG_SOURCES   []string
+	RSS_SOURCES  []string
+	DATABASE_URL string
 }
 
 func NewConfig() (cfg *Config, err error) {
@@ -45,6 +46,8 @@ func NewConfig() (cfg *Config, err error) {
 	for i := range cfg.RSS_SOURCES {
 		cfg.RSS_SOURCES[i] = strings.TrimSpace(cfg.RSS_SOURCES[i])
 	}
+
+	cfg.DATABASE_URL = os.Getenv(("DATABASE_URL"))
 
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -77,6 +80,10 @@ func (c *Config) validate() error {
 
 	if len(c.RSS_SOURCES) == 0 {
 		return errors.New("RSS_SOURCES can't be empty")
+	}
+
+	if len(c.DATABASE_URL) == 0 {
+		return errors.New("DATABASE_URL can't be empty")
 	}
 
 	return nil
