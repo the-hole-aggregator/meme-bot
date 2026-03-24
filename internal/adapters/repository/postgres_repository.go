@@ -15,6 +15,26 @@ type PostgresRepository struct {
 func NewPostgresRepository(db *pgxpool.Pool) ports.Repository {
 	return &PostgresRepository{db: db}
 }
+func (r *PostgresRepository) GetByID(id int) (domain.Meme, error) {
+	query := `
+		SELECT id, phash, status, source, source_id, created_at
+		FROM memes
+		WHERE id = $1
+	`
+
+	var m domain.Meme
+
+	err := r.db.QueryRow(context.Background(), query, id).Scan(
+		&m.ID,
+		&m.PHash,
+		&m.Status,
+		&m.Source,
+		&m.SourceID,
+		&m.CreatedAt,
+	)
+
+	return m, err
+}
 
 func (r *PostgresRepository) Save(m *domain.Meme) error {
 	query := `
@@ -120,4 +140,14 @@ func (r *PostgresRepository) GetOldestApproved() (domain.Meme, error) {
 	)
 
 	return m, err
+}
+
+func (r *PostgresRepository) Delete(ID int) error {
+	query := `
+		DELETE FROM memes
+		WHERE id = $1
+	`
+
+	_, err := r.db.Exec(context.Background(), query, ID)
+	return err
 }
