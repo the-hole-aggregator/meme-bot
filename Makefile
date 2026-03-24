@@ -28,6 +28,9 @@ remove-db:
 	migrate -path migrations -database $(DATABASE_URL) down
 	docker compose down -v
 	
+show-db:
+	psql $(DATABASE_URL)
+	
 	
 help:
 	@echo " - hooks_init: init git hooks"

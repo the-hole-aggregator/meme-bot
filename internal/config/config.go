@@ -12,13 +12,15 @@ import (
 )
 
 type Config struct {
-	PHONE        string
-	PASSWORD     string
-	TG_API_ID    int
-	TG_API_HASH  string
-	TG_SOURCES   []string
-	RSS_SOURCES  []string
-	DATABASE_URL string
+	PHONE              string
+	PASSWORD           string
+	TG_BOT_TOKEN       string
+	TG_API_ID          int
+	TG_API_HASH        string
+	TG_SOURCES         []string
+	RSS_SOURCES        []string
+	DATABASE_URL       string
+	MODERATION_CHAT_ID int64
 }
 
 func NewConfig() (cfg *Config, err error) {
@@ -31,6 +33,8 @@ func NewConfig() (cfg *Config, err error) {
 
 	cfg.PHONE = os.Getenv("PHONE_NUMBER")
 	cfg.PASSWORD = os.Getenv("PASSWORD")
+
+	cfg.TG_BOT_TOKEN = os.Getenv("TG_BOT_TOKEN")
 
 	cfg.TG_API_ID, err = getEnvAsInt("TG_API_ID")
 	if err != nil {
@@ -49,6 +53,11 @@ func NewConfig() (cfg *Config, err error) {
 
 	cfg.DATABASE_URL = os.Getenv(("DATABASE_URL"))
 
+	cfg.MODERATION_CHAT_ID, err = getEnvAsInt64("MODERATION_CHAT_ID")
+	if err != nil {
+		return nil, err
+	}
+
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -58,6 +67,10 @@ func NewConfig() (cfg *Config, err error) {
 }
 
 func (c *Config) validate() error {
+	if c.TG_BOT_TOKEN == "" {
+		return errors.New("TG_BOT_TOKEN is required")
+	}
+
 	if c.TG_API_ID == 0 {
 		return errors.New("TG_API_ID is required")
 	}
@@ -82,8 +95,8 @@ func (c *Config) validate() error {
 		return errors.New("RSS_SOURCES can't be empty")
 	}
 
-	if len(c.DATABASE_URL) == 0 {
-		return errors.New("DATABASE_URL can't be empty")
+	if c.DATABASE_URL == "" {
+		return errors.New("DATABASE_URL is required")
 	}
 
 	return nil
@@ -98,6 +111,20 @@ func getEnvAsInt(key string) (int, error) {
 	intVal, err := strconv.Atoi(val)
 	if err != nil {
 		return 0, fmt.Errorf("%s must be int: %w", key, err)
+	}
+
+	return intVal, nil
+}
+
+func getEnvAsInt64(key string) (int64, error) {
+	val := os.Getenv(key)
+	if val == "" {
+		return 0, fmt.Errorf("%s is required", key)
+	}
+
+	intVal, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be int64: %w", key, err)
 	}
 
 	return intVal, nil
