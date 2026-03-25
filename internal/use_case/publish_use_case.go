@@ -32,6 +32,14 @@ func (uc *PublishUseCase) Call() error {
 		}
 	}
 
+	if err := uc.repo.Delete(meme.ID); err != nil {
+		return err
+	}
+
+	if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
+		return err
+	}
+
 	if len(publishErrors) > 0 {
 		err := fmt.Errorf("publish errors: %v", publishErrors)
 		uc.logger.Error(err.Error())
@@ -39,14 +47,6 @@ func (uc *PublishUseCase) Call() error {
 		if len(publishErrors) == len(uc.publishers) {
 			return err
 		}
-	}
-
-	if err := uc.repo.Delete(meme.ID); err != nil {
-		return err
-	}
-
-	if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
-		return err
 	}
 
 	return uc.repo.UpdateStatus(meme.ID, domain.Posted)

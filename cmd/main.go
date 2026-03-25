@@ -69,13 +69,13 @@ func main() {
 
 	// --- PUBLISHERS ---
 	moderationPublisher := publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID)
-	telegramPublisher := publisher.NewTelegramPublisher(bot, cfg.TG_CHANNEL_ID)
+	tgPublisher := publisher.NewTGPublisher(bot, cfg.TG_CHANNEL_ID)
 
 	// --- USECASES ---
 	ingestionUC := usecase.NewIngestionUseCase(repo, sources, logger)
 	sendToModerationUC := usecase.NewSendToModerationUseCase(moderationPublisher, repo)
 	moderationUC := usecase.NewHandleModerationResultUseCase(repo)
-	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{telegramPublisher}, repo, logger)
+	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger)
 
 	// -- First start ingestion
 	if err := runIngestion(ctx, tgClient, cfg, ingestionUC); err != nil {
