@@ -9,5 +9,6 @@ type Repository interface {
 	GetByStatus(status domain.MemeStatus) ([]domain.Meme, error)
 	UpdateStatus(ID int, status domain.MemeStatus) error
 	GetOldestApproved() (domain.Meme, error)
+	GetOldestPending() (domain.Meme, error)
 	Delete(ID int) error
 }

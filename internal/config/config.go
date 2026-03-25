@@ -21,6 +21,7 @@ type Config struct {
 	RSS_SOURCES        []string
 	DATABASE_URL       string
 	MODERATION_CHAT_ID int64
+	TG_CHANNEL_ID      int64
 }
 
 func NewConfig() (cfg *Config, err error) {
@@ -54,6 +55,11 @@ func NewConfig() (cfg *Config, err error) {
 	cfg.DATABASE_URL = os.Getenv(("DATABASE_URL"))
 
 	cfg.MODERATION_CHAT_ID, err = getEnvAsInt64("MODERATION_CHAT_ID")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.TG_CHANNEL_ID, err = getEnvAsInt64("TG_CHANNEL_ID")
 	if err != nil {
 		return nil, err
 	}

@@ -1,31 +1,25 @@
 package usecase
 
 import (
-	"errors"
-	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
 )
 
 type SendToModerationUseCase struct {
 	moderation ports.Publisher
-	repository ports.Repository
+	repo       ports.Repository
 }
 
 func NewSendToModerationUseCase(moderation ports.Publisher, repository ports.Repository) *SendToModerationUseCase {
-	return &SendToModerationUseCase{moderation: moderation, repository: repository}
+	return &SendToModerationUseCase{moderation: moderation, repo: repository}
 }
 
-func (m *SendToModerationUseCase) Call() error {
-	pendingMemes, err := m.repository.GetByStatus(domain.Pending)
+func (uc *SendToModerationUseCase) Call() error {
+	meme, err := uc.repo.GetOldestPending()
 	if err != nil {
 		return err
 	}
 
-	if len(pendingMemes) == 0 {
-		return errors.New("there is no any pending meme to moderate")
-	}
-
-	if err := m.moderation.Publish(pendingMemes[0]); err != nil {
+	if err := uc.moderation.Publish(meme); err != nil {
 		return err
 	}
 

@@ -67,10 +67,15 @@ func main() {
 	// --- SOURCES ---
 	sources := createSources(cfg, tgClient)
 
+	// --- PUBLISHERS ---
+	moderationPublisher := publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID)
+	telegramPublisher := publisher.NewTelegramPublisher(bot, cfg.TG_CHANNEL_ID)
+
 	// --- USECASES ---
 	ingestionUC := usecase.NewIngestionUseCase(repo, sources, logger)
-	sendToModerationUC := usecase.NewSendToModerationUseCase(publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID), repo)
+	sendToModerationUC := usecase.NewSendToModerationUseCase(moderationPublisher, repo)
 	moderationUC := usecase.NewHandleModerationResultUseCase(repo)
+	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{telegramPublisher}, repo, logger)
 
 	// -- First start ingestion
 	if err := runIngestion(ctx, tgClient, cfg, ingestionUC); err != nil {
@@ -80,7 +85,7 @@ func main() {
 	// --- CRON ---
 	c := cron.New(cron.WithLocation(time.Local))
 
-	// ingestion: sunday 10:00
+	// Ingestion: sunday 10:00
 	_, err = c.AddFunc("0 10 * * 0", func() {
 		logger.Info("Running ingestion...")
 
@@ -93,12 +98,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// send to moderation: daily 10:00 and 20:00
-	_, err = c.AddFunc("0 10,20 * * *", func() {
+	// Send to moderation: daily 9:00 and 19:00
+	_, err = c.AddFunc("0 9,19 * * *", func() {
 		logger.Info("Send memes to moderation...")
 
 		if err := sendToModerationUC.Call(); err != nil {
 			logger.Error("send failed", "err", err)
+		}
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Publish: daily 10:00 and 20:00
+	_, err = c.AddFunc("0 10,20 * * *", func() {
+		logger.Info("Publishing memes...")
+
+		if err := publishUC.Call(); err != nil {
+			logger.Error("publish failed", "err", err)
 		}
 	})
 	if err != nil {

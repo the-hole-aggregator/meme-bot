@@ -24,25 +24,26 @@ func NewHandleModerationResultUseCase(repo ports.Repository) *HandleModerationRe
 	return &HandleModerationResultUseCase{repo: repo}
 }
 
-func (h *HandleModerationResultUseCase) Call(id int, userSelection UserSelectionType) error {
+func (uc *HandleModerationResultUseCase) Call(id int, userSelection UserSelectionType) error {
 	switch userSelection {
 	case Approved:
-		if err := h.repo.UpdateStatus(id, domain.Approved); err != nil {
+		if err := uc.repo.UpdateStatus(id, domain.Approved); err != nil {
 			return err
 		}
 	case Rejected:
-		meme, err := h.repo.GetByID(id)
+		meme, err := uc.repo.GetByID(id)
 		if err != nil {
 			return errors.Wrap(err, "failed on getting meme by ID")
+		}
+
+		if err := uc.repo.Delete(id); err != nil {
+			return err
 		}
 
 		if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
 			return err
 		}
 
-		if err := h.repo.Delete(id); err != nil {
-			return err
-		}
 	default:
 		return fmt.Errorf("there is no such user selection type: %s", userSelection)
 	}
