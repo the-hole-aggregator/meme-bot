@@ -142,6 +142,33 @@ func (r *PostgresRepository) GetOldestApproved() (domain.Meme, error) {
 	return m, err
 }
 
+func (r *PostgresRepository) GetOldestPending() (domain.Meme, error) {
+	query := `
+		SELECT id, phash, status, source, source_id, created_at
+		FROM memes
+		WHERE status = $1
+		ORDER BY created_at
+		LIMIT 1
+	`
+
+	var m domain.Meme
+
+	err := r.db.QueryRow(
+		context.Background(),
+		query,
+		domain.Pending,
+	).Scan(
+		&m.ID,
+		&m.PHash,
+		&m.Status,
+		&m.Source,
+		&m.SourceID,
+		&m.CreatedAt,
+	)
+
+	return m, err
+}
+
 func (r *PostgresRepository) Delete(ID int) error {
 	query := `
 		DELETE FROM memes
