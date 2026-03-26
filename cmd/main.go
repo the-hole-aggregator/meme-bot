@@ -8,16 +8,17 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
+	"meme-bot/internal/adapters"
 	"meme-bot/internal/adapters/publisher"
 	"meme-bot/internal/adapters/repository"
 	"meme-bot/internal/adapters/source"
 	"meme-bot/internal/adapters/source/downloader"
 	"meme-bot/internal/config"
+	"meme-bot/internal/delivery"
 	"meme-bot/internal/ports"
+	"meme-bot/internal/scheduler"
 	usecase "meme-bot/internal/use_case"
 	"meme-bot/internal/util"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcdole/gofeed"
-	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -42,6 +42,8 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	fileRemover := adapters.OSFileRemover{}
 
 	// --- DB ---
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
@@ -64,68 +66,58 @@ func main() {
 		SessionStorage: sessionStorage,
 	})
 
-	// --- SOURCES ---
-	sources := createSources(cfg, tgClient)
-
 	// --- PUBLISHERS ---
 	moderationPublisher := publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID)
 	tgPublisher := publisher.NewTGPublisher(bot, cfg.TG_CHANNEL_ID)
 
-	// --- USECASES ---
-	ingestionUC := usecase.NewIngestionUseCase(repo, sources, logger)
+	// --- USE CASES ---
+	ingestionUC := usecase.NewIngestionUseCase(repo, createSources(cfg, tgClient), logger, fileRemover)
 	sendToModerationUC := usecase.NewSendToModerationUseCase(moderationPublisher, repo)
-	moderationUC := usecase.NewHandleModerationResultUseCase(repo)
-	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger)
+	moderationUC := usecase.NewHandleModerationResultUseCase(repo, fileRemover)
+	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger, fileRemover)
 
-	// -- First start ingestion
+	// --- HANDLERS ---
+	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, logger)
+
+	// --- TELEGRAM CALLBACK HANDLER ---
+	go moderationHandler.Start()
+
+	// Init ingestion
+	logger.Info("Running ingestion...")
 	if err := runIngestion(ctx, tgClient, cfg, ingestionUC); err != nil {
 		logger.Error("ingestion failed", "err", err)
 	}
 
-	// --- CRON ---
-	c := cron.New(cron.WithLocation(time.Local))
+	scheduler := scheduler.NewCronScheduler()
 
-	// Ingestion: sunday 10:00
-	_, err = c.AddFunc("0 10 * * 0", func() {
-		logger.Info("Running ingestion...")
+	if err := scheduler.RegisterJobs(
+		func() {
+			logger.Info("Running ingestion...")
 
-		err := runIngestion(ctx, tgClient, cfg, ingestionUC)
-		if err != nil {
-			logger.Error("ingestion failed", "err", err)
-		}
-	})
-	if err != nil {
+			err := runIngestion(ctx, tgClient, cfg, ingestionUC)
+			if err != nil {
+				logger.Error("ingestion failed", "err", err)
+			}
+		},
+		func() {
+			logger.Info("Send memes to moderation...")
+
+			if err := sendToModerationUC.Call(); err != nil {
+				logger.Error("send failed", "err", err)
+			}
+		},
+		func() {
+			logger.Info("Publishing memes...")
+
+			if err := publishUC.Call(); err != nil {
+				logger.Error("publish failed", "err", err)
+			}
+		},
+	); err != nil {
 		log.Fatal(err)
 	}
 
-	// Send to moderation: daily 9:00 and 19:00
-	_, err = c.AddFunc("0 9,19 * * *", func() {
-		logger.Info("Send memes to moderation...")
-
-		if err := sendToModerationUC.Call(); err != nil {
-			logger.Error("send failed", "err", err)
-		}
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Publish: daily 10:00 and 20:00
-	_, err = c.AddFunc("0 10,20 * * *", func() {
-		logger.Info("Publishing memes...")
-
-		if err := publishUC.Call(); err != nil {
-			logger.Error("publish failed", "err", err)
-		}
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	c.Start()
-
-	// --- TELEGRAM CALLBACK HANDLER ---
-	go startModerationListener(bot, moderationUC, logger)
+	scheduler.Start()
 
 	// --- BLOCK MAIN ---
 	select {}
@@ -192,43 +184,4 @@ func createSources(
 	}
 
 	return sources
-}
-
-func startModerationListener(
-	bot *tgbotapi.BotAPI,
-	uc *usecase.HandleModerationResultUseCase,
-	logger *slog.Logger,
-) {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 30
-
-	updates := bot.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.CallbackQuery == nil {
-			continue
-		}
-
-		cb := update.CallbackQuery
-
-		parts := strings.Split(cb.Data, ":")
-		if len(parts) != 2 {
-			continue
-		}
-
-		action := parts[0]
-		id, _ := strconv.Atoi(parts[1])
-
-		if err := uc.Call(id, usecase.UserSelectionType(action)); err != nil {
-			logger.Error("moderation failed", "err", err)
-			if _, err := bot.Request(tgbotapi.NewCallback(cb.ID, "ERROR")); err != nil {
-				logger.Error(err.Error())
-			}
-			continue
-		}
-
-		if _, err := bot.Request(tgbotapi.NewCallback(cb.ID, "OK")); err != nil {
-			logger.Error(err.Error())
-		}
-	}
 }

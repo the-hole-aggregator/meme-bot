@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
-	"os"
 
 	"github.com/go-faster/errors"
 )
@@ -17,11 +16,18 @@ const (
 )
 
 type HandleModerationResultUseCase struct {
-	repo ports.Repository
+	repo        ports.Repository
+	fileRemover ports.FileRemover
 }
 
-func NewHandleModerationResultUseCase(repo ports.Repository) *HandleModerationResultUseCase {
-	return &HandleModerationResultUseCase{repo: repo}
+func NewHandleModerationResultUseCase(
+	repo ports.Repository,
+	fileRemover ports.FileRemover,
+) *HandleModerationResultUseCase {
+	return &HandleModerationResultUseCase{
+		repo:        repo,
+		fileRemover: fileRemover,
+	}
 }
 
 func (uc *HandleModerationResultUseCase) Call(id int, userSelection UserSelectionType) error {
@@ -40,7 +46,7 @@ func (uc *HandleModerationResultUseCase) Call(id int, userSelection UserSelectio
 			return err
 		}
 
-		if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
+		if err := uc.fileRemover.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
 			return err
 		}
 

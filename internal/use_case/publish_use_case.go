@@ -5,17 +5,27 @@ import (
 	"log/slog"
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
-	"os"
 )
 
 type PublishUseCase struct {
-	publishers []ports.Publisher
-	repo       ports.Repository
-	logger     *slog.Logger
+	publishers  []ports.Publisher
+	repo        ports.Repository
+	logger      *slog.Logger
+	fileRemover ports.FileRemover
 }
 
-func NewPublisherUseCase(publishers []ports.Publisher, repository ports.Repository, logger *slog.Logger) *PublishUseCase {
-	return &PublishUseCase{publishers: publishers, repo: repository, logger: logger}
+func NewPublisherUseCase(
+	publishers []ports.Publisher,
+	repository ports.Repository,
+	logger *slog.Logger,
+	fileRemover ports.FileRemover,
+) *PublishUseCase {
+	return &PublishUseCase{
+		publishers:  publishers,
+		repo:        repository,
+		logger:      logger,
+		fileRemover: fileRemover,
+	}
 }
 
 func (uc *PublishUseCase) Call() error {
@@ -36,7 +46,7 @@ func (uc *PublishUseCase) Call() error {
 		return err
 	}
 
-	if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
+	if err := uc.fileRemover.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
 		return err
 	}
 

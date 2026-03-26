@@ -31,6 +31,11 @@ remove-db:
 show-db:
 	psql $(DATABASE_URL)
 	
+test:
+	@echo "Tests running..."
+	go test -v ./...
+	@echo "Tests completed"
+	
 	
 help:
 	@echo " - hooks_init: init git hooks"

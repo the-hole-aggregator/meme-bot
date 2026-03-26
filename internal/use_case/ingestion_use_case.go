@@ -8,26 +8,28 @@ import (
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
 	"os"
-	"strconv"
 )
 
 const maxAttempts = 50
 
 type IngestionUseCase struct {
-	repository ports.Repository
-	sources    []ports.Source
-	logger     *slog.Logger
+	repository  ports.Repository
+	sources     []ports.Source
+	logger      *slog.Logger
+	fileRemover ports.FileRemover
 }
 
 func NewIngestionUseCase(
 	repository ports.Repository,
 	sources []ports.Source,
 	logger *slog.Logger,
+	fileRemover ports.FileRemover,
 ) *IngestionUseCase {
 	return &IngestionUseCase{
-		repository: repository,
-		sources:    sources,
-		logger:     logger,
+		repository:  repository,
+		sources:     sources,
+		logger:      logger,
+		fileRemover: fileRemover,
 	}
 }
 
@@ -51,7 +53,7 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 		}
 
 		if !uc.validate(meme, filePath) {
-			err := os.Remove(filePath)
+			err := uc.fileRemover.Remove(filePath)
 			if err != nil {
 				uc.logger.Error("failed on removing image file")
 			}
@@ -61,7 +63,7 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 
 		if err := uc.repository.Save(meme); err != nil {
 			uc.logger.Error(fmt.Errorf("save error: %s", err).Error())
-			err := os.Remove(filePath)
+			err := uc.fileRemover.Remove(filePath)
 			if err != nil {
 				uc.logger.Error("failed on removing image file")
 			}
@@ -71,7 +73,10 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 		collected++
 	}
 
-	uc.logger.Info("ingestion finished: collected=%d attempts=%d", strconv.Itoa(collected), attempts)
+	uc.logger.Info("ingestion finished",
+		"collected", collected,
+		"attempts", attempts,
+	)
 
 	if collected == 0 {
 		return fmt.Errorf("no memes collected after %d attempts", attempts)
