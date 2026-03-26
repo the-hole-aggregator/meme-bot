@@ -9,13 +9,24 @@ import (
 )
 
 type PublishUseCase struct {
-	publishers []ports.Publisher
-	repo       ports.Repository
-	logger     *slog.Logger
+	publishers  []ports.Publisher
+	repo        ports.Repository
+	logger      *slog.Logger
+	fileRemover ports.FileRemover
 }
 
-func NewPublisherUseCase(publishers []ports.Publisher, repository ports.Repository, logger *slog.Logger) *PublishUseCase {
-	return &PublishUseCase{publishers: publishers, repo: repository, logger: logger}
+func NewPublisherUseCase(
+	publishers []ports.Publisher,
+	repository ports.Repository,
+	logger *slog.Logger,
+	fileRemover ports.FileRemover,
+) *PublishUseCase {
+	return &PublishUseCase{
+		publishers:  publishers,
+		repo:        repository,
+		logger:      logger,
+		fileRemover: fileRemover,
+	}
 }
 
 func (uc *PublishUseCase) Call() error {
