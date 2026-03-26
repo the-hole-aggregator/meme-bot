@@ -18,6 +18,7 @@ import (
 	"meme-bot/internal/config"
 	"meme-bot/internal/delivery"
 	"meme-bot/internal/ports"
+	"meme-bot/internal/scheduler"
 	usecase "meme-bot/internal/use_case"
 	"meme-bot/internal/util"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcdole/gofeed"
-	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -82,52 +82,42 @@ func main() {
 	// --- TELEGRAM CALLBACK HANDLER ---
 	go moderationHandler.Start()
 
-	// -- First start ingestion
+	// Init ingestion
+	logger.Info("Running ingestion...")
 	if err := runIngestion(ctx, tgClient, cfg, ingestionUC); err != nil {
 		logger.Error("ingestion failed", "err", err)
 	}
 
-	// --- CRON ---
-	c := cron.New(cron.WithLocation(time.Local))
+	scheduler := scheduler.NewCronScheduler()
 
-	// Ingestion: sunday 10:00
-	_, err = c.AddFunc("0 10 * * 0", func() {
-		logger.Info("Running ingestion...")
+	if err := scheduler.RegisterJobs(
+		func() {
+			logger.Info("Running ingestion...")
 
-		err := runIngestion(ctx, tgClient, cfg, ingestionUC)
-		if err != nil {
-			logger.Error("ingestion failed", "err", err)
-		}
-	})
-	if err != nil {
+			err := runIngestion(ctx, tgClient, cfg, ingestionUC)
+			if err != nil {
+				logger.Error("ingestion failed", "err", err)
+			}
+		},
+		func() {
+			logger.Info("Send memes to moderation...")
+
+			if err := sendToModerationUC.Call(); err != nil {
+				logger.Error("send failed", "err", err)
+			}
+		},
+		func() {
+			logger.Info("Publishing memes...")
+
+			if err := publishUC.Call(); err != nil {
+				logger.Error("publish failed", "err", err)
+			}
+		},
+	); err != nil {
 		log.Fatal(err)
 	}
 
-	// Send to moderation: daily 9:00 and 19:00
-	_, err = c.AddFunc("0 9,19 * * *", func() {
-		logger.Info("Send memes to moderation...")
-
-		if err := sendToModerationUC.Call(); err != nil {
-			logger.Error("send failed", "err", err)
-		}
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Publish: daily 10:00 and 20:00
-	_, err = c.AddFunc("0 10,20 * * *", func() {
-		logger.Info("Publishing memes...")
-
-		if err := publishUC.Call(); err != nil {
-			logger.Error("publish failed", "err", err)
-		}
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	c.Start()
+	scheduler.Start()
 
 	// --- BLOCK MAIN ---
 	select {}

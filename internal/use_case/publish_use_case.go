@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
-	"os"
 )
 
 type PublishUseCase struct {
@@ -47,7 +46,7 @@ func (uc *PublishUseCase) Call() error {
 		return err
 	}
 
-	if err := os.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
+	if err := uc.fileRemover.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
 		return err
 	}
 
