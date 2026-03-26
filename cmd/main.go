@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"meme-bot/internal/adapters"
 	"meme-bot/internal/adapters/publisher"
 	"meme-bot/internal/adapters/repository"
 	"meme-bot/internal/adapters/source"
@@ -42,6 +43,8 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+	fileRemover := adapters.OSFileRemover{}
+
 	// --- DB ---
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -68,10 +71,10 @@ func main() {
 	tgPublisher := publisher.NewTGPublisher(bot, cfg.TG_CHANNEL_ID)
 
 	// --- USE CASES ---
-	ingestionUC := usecase.NewIngestionUseCase(repo, createSources(cfg, tgClient), logger)
+	ingestionUC := usecase.NewIngestionUseCase(repo, createSources(cfg, tgClient), logger, fileRemover)
 	sendToModerationUC := usecase.NewSendToModerationUseCase(moderationPublisher, repo)
-	moderationUC := usecase.NewHandleModerationResultUseCase(repo)
-	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger)
+	moderationUC := usecase.NewHandleModerationResultUseCase(repo, fileRemover)
+	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger, fileRemover)
 
 	// --- HANDLERS ---
 	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, logger)
