@@ -8,7 +8,6 @@ import (
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
 	"os"
-	"strconv"
 )
 
 const maxAttempts = 50
@@ -74,7 +73,10 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 		collected++
 	}
 
-	uc.logger.Info("ingestion finished: collected=%d attempts=%d", strconv.Itoa(collected), attempts)
+	uc.logger.Info("ingestion finished",
+		"collected", collected,
+		"attempts", attempts,
+	)
 
 	if collected == 0 {
 		return fmt.Errorf("no memes collected after %d attempts", attempts)
