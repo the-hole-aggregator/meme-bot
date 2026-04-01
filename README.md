@@ -9,6 +9,8 @@ This bot collects memes from multiple sources – Telegram channels, RSS feeds �
 * **Moderate**: send memes to a private moderation channel for review
 * **Publish**: post approved memes to a public Telegram channel on a scheduled basis
 
+👉 [Follow link to subscribe](https://t.me/the_hole_memes)
+
 ---
 
 ## 📀 Architecture
@@ -27,10 +29,11 @@ The project architecture is based on Clean Architecture principles, with a clear
 
 ## 📚 Documentation
 
-| Section                                                         | Description                  |
-| --------------------------------------------------------------- | ---------------------------- |
-| [architecture.md](docs/architecture.md)                         | Layers overview              |
-| [git\_workflow\_guidelines.md](docs/git_workflow_guidelines.md) | Git flow and branching rules |
+| Section                                                         | Description                        |
+| --------------------------------------------------------------- | ---------------------------------- |
+| [architecture.md](docs/architecture.md)                         | Layers overview                    |
+| [git\_workflow\_guidelines.md](docs/git_workflow_guidelines.md) | Git flow and branching rules       |
+| [env.md](docs/env.md)                                           | Environment configs and .env usage |
 
 ---
 
