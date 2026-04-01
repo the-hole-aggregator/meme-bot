@@ -42,7 +42,7 @@ MEME-12345: refactor(api): change endpoint name
 
 - `main` — latest production-ready version (what users currently have)
 - `dev` — all tested features merged here; always stable
-- `feature/MEME-<task-id>` — new feature development
+- `MEME-<task-id>` — new feature development
 - `release/<date>` — created from `dev` for release preparation and QA
 
 ---
