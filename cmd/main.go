@@ -86,10 +86,7 @@ func main() {
 		logger.Error("ingestion failed", "err", err)
 	}
 
-	scheduler, err := scheduler.NewCronScheduler()
-	if err != nil {
-		log.Fatal(err)
-	}
+	scheduler := scheduler.NewCronScheduler()
 
 	if err := scheduler.RegisterJobs(
 		func() {

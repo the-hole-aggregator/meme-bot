@@ -3,7 +3,6 @@ package scheduler
 import (
 	"time"
 
-	"github.com/go-faster/errors"
 	"github.com/robfig/cron/v3"
 )
 
@@ -11,15 +10,10 @@ type CronScheduler struct {
 	cron *cron.Cron
 }
 
-func NewCronScheduler() (*CronScheduler, error) {
-	loc, err := time.LoadLocation("Europe/Moscow")
-	if err !=nil {
-		return nil, errors.Wrap(err, "failed on cron initialization")
-	}
-	
+func NewCronScheduler() *CronScheduler {
 	return &CronScheduler{
-		cron: cron.New(cron.WithLocation(loc)),
-	}, nil
+		cron: cron.New(cron.WithLocation(time.Local)),
+	}
 }
 
 func (s *CronScheduler) RegisterJobs(
