@@ -13,23 +13,28 @@ hooks-init:
 lint:
 	golangci-lint run
 	
+
+build:
+	GOOS=linux GOARCH=amd64 go build -o bot ./cmd
+	
 dev-up:
-	docker compose up -d
-	sleep 3
-	migrate -path migrations -database $(DATABASE_URL) up
-	go run cmd/main.go
+	docker compose up -d postgres
+	sleep 5
+	docker compose run --rm migrate
+	docker compose up -d --build bot
 	
 dev-down:
-	migrate -path migrations -database $(DATABASE_URL) down
 	docker compose down
-	pkill -f "go run cmd/main.go"
 	
 remove-db:
-	migrate -path migrations -database $(DATABASE_URL) down
+	docker compose run --rm migrate -path migrations -database "$DATABASE_URL" down
 	docker compose down -v
 	
 show-db:
-	psql $(DATABASE_URL)
+	docker exec -it memes_db psql "$(DATABASE_URL)"
+	
+logs:
+	docker compose logs -f bot
 	
 test:
 	@echo "Tests running..."

@@ -3,12 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -25,11 +22,6 @@ type Config struct {
 }
 
 func NewConfig() (cfg *Config, err error) {
-	err = godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file ", err)
-	}
-
 	cfg = &Config{}
 
 	cfg.PHONE = os.Getenv("PHONE_NUMBER")
