@@ -1,14 +1,33 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15.6
     container_name: memes_db
     restart: always
     env_file:
       - .env
-    ports:
-      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    container_name: memes_bot
+    restart: always
+    volumes:
+      - ./tmp:/app/tmp
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+
+  migrate:
+    image: migrate/migrate
+    container_name: memes_migrate
+    depends_on:
+      - postgres
+    volumes:
+      - ./migrations:/migrations
+    entrypoint:
+      ["migrate", "-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
 
 volumes:
   postgres_data:

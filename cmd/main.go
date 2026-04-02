@@ -59,13 +59,17 @@ func main() {
 	}
 
 	// --- TELEGRAM CLIENT (meme's parsing) ---
+	if err := os.MkdirAll("tmp", 0755); err != nil {
+		log.Fatal(errors.Wrap(err, "failed to create tmp directory"))	
+	}
 	sessionStorage := &session.FileStorage{
-		Path: "session.json",
+		Path: "tmp/session.json",
+		
 	}
 	tgClient := telegram.NewClient(cfg.TG_API_ID, cfg.TG_API_HASH, telegram.Options{
 		SessionStorage: sessionStorage,
 	})
-
+	
 	// --- PUBLISHERS ---
 	moderationPublisher := publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID)
 	tgPublisher := publisher.NewTGPublisher(bot, cfg.TG_CHANNEL_ID)
@@ -75,12 +79,6 @@ func main() {
 	sendToModerationUC := usecase.NewSendToModerationUseCase(moderationPublisher, repo)
 	moderationUC := usecase.NewHandleModerationResultUseCase(repo, fileRemover)
 	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger, fileRemover)
-
-	// --- HANDLERS ---
-	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, logger)
-
-	// --- TELEGRAM CALLBACK HANDLER ---
-	go moderationHandler.Start()
 
 	// Init ingestion
 	logger.Info("Running ingestion...")
@@ -118,6 +116,12 @@ func main() {
 	}
 
 	scheduler.Start()
+	
+	// --- HANDLERS ---
+	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, sendToModerationUC, logger)
+
+	// --- TELEGRAM CALLBACK HANDLER ---
+	go moderationHandler.Start()
 
 	// --- BLOCK MAIN ---
 	select {}
@@ -150,7 +154,7 @@ func runIngestion(
 			return err
 		}
 
-		return uc.Call(ctx, 14)
+		return uc.Call(ctx, 20)
 	})
 }
 

@@ -11,20 +11,23 @@ import (
 )
 
 type ModerationHandler struct {
-	bot    *tgbotapi.BotAPI
-	uc     *usecase.HandleModerationResultUseCase
-	logger *slog.Logger
+	bot                *tgbotapi.BotAPI
+	handleModerationUC *usecase.HandleModerationResultUseCase
+	sendToModerationUC *usecase.SendToModerationUseCase
+	logger             *slog.Logger
 }
 
 func NewModerationHandler(
 	bot *tgbotapi.BotAPI,
-	uc *usecase.HandleModerationResultUseCase,
+	handleModerationUC *usecase.HandleModerationResultUseCase,
+	sendToModerationUC *usecase.SendToModerationUseCase,
 	logger *slog.Logger,
 ) *ModerationHandler {
 	return &ModerationHandler{
-		bot:    bot,
-		uc:     uc,
-		logger: logger,
+		bot:                bot,
+		handleModerationUC: handleModerationUC,
+		sendToModerationUC: sendToModerationUC,
+		logger:             logger,
 	}
 }
 
@@ -58,11 +61,19 @@ func (h *ModerationHandler) handleUpdate(update tgbotapi.Update) {
 		return
 	}
 
-	if err := h.uc.Call(id, usecase.UserSelectionType(action)); err != nil {
+	if err := h.handleModerationUC.Call(id, usecase.UserSelectionType(action)); err != nil {
 		h.logger.Error("moderation failed", "err", err)
 
 		h.answerCallback(cb.ID, "ERROR")
 		return
+	}
+
+	if usecase.UserSelectionType(action) == usecase.Rejected {
+		if err := h.sendToModerationUC.Call(); err != nil {
+			h.logger.Error("failed to send additional meme for moderation", "err", err)
+
+			h.answerCallback(cb.ID, "ERROR")
+		}
 	}
 
 	h.answerCallback(cb.ID, "OK")
