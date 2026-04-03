@@ -32,3 +32,6 @@ session.json
 
 # Temp folder files
 tmp/
+
+# Executable bot
+bot
