@@ -87,6 +87,8 @@ func main() {
 	}
 
 	scheduler := scheduler.NewCronScheduler()
+	logger.Info("Scheduler has been initialized...")
+	logger.Info("Current time: %v, UTC: %v\n", time.Now().String(), time.Now().Local)
 
 	if err := scheduler.RegisterJobs(
 		func() {
@@ -116,6 +118,7 @@ func main() {
 	}
 
 	scheduler.Start()
+	logger.Info("Scheduler has been started...")
 	
 	// --- HANDLERS ---
 	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, sendToModerationUC, logger)
