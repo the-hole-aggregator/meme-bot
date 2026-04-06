@@ -82,7 +82,7 @@ func main() {
 
 	// Init ingestion
 	logger.Info("Running ingestion...")
-	if err := runIngestion(ctx, tgClient, cfg, ingestionUC); err != nil {
+	if err := runIngestion( tgClient, cfg, ingestionUC); err != nil {
 		logger.Error("ingestion failed", "err", err)
 	}
 
@@ -94,7 +94,7 @@ func main() {
 		func() {
 			logger.Info("Running ingestion...")
 
-			err := runIngestion(ctx, tgClient, cfg, ingestionUC)
+			err := runIngestion( tgClient, cfg, ingestionUC)
 			if err != nil {
 				logger.Error("ingestion failed", "err", err)
 			}
@@ -131,11 +131,12 @@ func main() {
 }
 
 func runIngestion(
-	ctx context.Context,
 	client *telegram.Client,
 	cfg *config.Config,
 	uc *usecase.IngestionUseCase,
 ) error {
+	
+	ctx := context.Background()
 
 	return client.Run(ctx, func(ctx context.Context) error {
 
