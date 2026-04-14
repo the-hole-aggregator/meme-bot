@@ -39,11 +39,7 @@ func (uc *HandleModerationResultUseCase) Call(id int, userSelection UserSelectio
 	case Rejected:
 		meme, err := uc.repo.GetByID(id)
 		if err != nil {
-<<<<<<< HEAD
-			return errors.Wrap(err, "failed on getting meme by ID")
-=======
 			return errors.Wrapf(err, "failed on getting meme by ID: %v", id)
->>>>>>> main
 		}
 
 		if err := uc.repo.Delete(id); err != nil {
