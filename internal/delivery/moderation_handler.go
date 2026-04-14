@@ -61,8 +61,8 @@ func (h *ModerationHandler) handleUpdate(update tgbotapi.Update) {
 		return
 	}
 
-	h.logger.Info("handle moderation event with", "action", "id", action, id)
-	
+	h.logger.Info("handle moderation event with", "action", action, "id", id)
+
 	if err := h.handleModerationUC.Call(id, usecase.UserSelectionType(action)); err != nil {
 		h.logger.Error("moderation failed", "err", err)
 
@@ -75,7 +75,7 @@ func (h *ModerationHandler) handleUpdate(update tgbotapi.Update) {
 			h.logger.Error("failed to send additional meme for moderation", "err", err)
 
 			h.answerCallback(cb.ID, "ERROR")
-			return 
+			return
 		}
 	}
 
