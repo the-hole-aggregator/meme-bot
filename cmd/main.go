@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -115,7 +116,7 @@ func main() {
 				case <-ingestionCh:
 					logger.Info("Running ingestion...")
 
-					if err := ingestionUC.Call(ctx, 50); err != nil {
+					if err := ingestionUC.Call(ctx, 60); err != nil {
 						logger.Error("ingestion failed", "err", err)
 					}
 				}
@@ -134,17 +135,15 @@ func main() {
 		func() {
 			logger.Info("Trigger ingestion...")
 
-			select {
-			case ingestionCh <- struct{}{}:
-			default:
-				logger.Info("Ingestion already queued, skipping")
-			}
-		},
-		func() {
+			runIngestion(ingestionCh, logger)
+		}, func() {
 			logger.Info("Send memes to moderation...")
 
 			if err := sendToModerationUC.Call(); err != nil {
 				logger.Error("send failed", "err", err)
+				if errors.Is(err, ports.ErrMemesEnded) {
+					runIngestion(ingestionCh, logger)
+				}
 			}
 		},
 		func() {
@@ -163,10 +162,10 @@ func main() {
 
 	// --- HANDLERS ---
 	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, sendToModerationUC, logger)
-	go moderationHandler.Start()
+	go moderationHandler.Start(func() { runIngestion(ingestionCh, logger) })
 
 	// --- INITIAL INGESTION ---
-	ingestionCh <- struct{}{}
+	runIngestion(ingestionCh, logger)
 
 	// --- BLOCK MAIN ---
 	select {}
@@ -212,4 +211,12 @@ func createSources(
 	}
 
 	return sources
+}
+
+func runIngestion(ingestionCh chan<- struct{}, logger *slog.Logger) {
+	select {
+	case ingestionCh <- struct{}{}:
+	default:
+		logger.Info("Ingestion already queued, skipping")
+	}
 }

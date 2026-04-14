@@ -1,6 +1,11 @@
 package ports
 
-import "meme-bot/internal/domain"
+import (
+	"errors"
+	"meme-bot/internal/domain"
+)
+
+var ErrMemesEnded = errors.New("memes have ended")
 
 type Repository interface {
 	GetByID(ID int) (domain.Meme, error)
