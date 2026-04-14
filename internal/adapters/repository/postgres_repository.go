@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"meme-bot/internal/domain"
 	"meme-bot/internal/ports"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -126,7 +128,7 @@ func (r *PostgresRepository) GetOldestApproved() (domain.Meme, error) {
 
 	var m domain.Meme
 
-	err := r.db.QueryRow(
+	if err := r.db.QueryRow(
 		context.Background(),
 		query,
 		domain.Approved,
@@ -137,9 +139,14 @@ func (r *PostgresRepository) GetOldestApproved() (domain.Meme, error) {
 		&m.Source,
 		&m.SourceID,
 		&m.CreatedAt,
-	)
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Meme{}, ports.ErrMemesEnded
+		}
+		return domain.Meme{}, err
+	}
 
-	return m, err
+	return m, nil
 }
 
 func (r *PostgresRepository) GetOldestPending() (domain.Meme, error) {
@@ -153,7 +160,7 @@ func (r *PostgresRepository) GetOldestPending() (domain.Meme, error) {
 
 	var m domain.Meme
 
-	err := r.db.QueryRow(
+	if err := r.db.QueryRow(
 		context.Background(),
 		query,
 		domain.Pending,
@@ -164,9 +171,14 @@ func (r *PostgresRepository) GetOldestPending() (domain.Meme, error) {
 		&m.Source,
 		&m.SourceID,
 		&m.CreatedAt,
-	)
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Meme{}, ports.ErrMemesEnded
+		}
+		return domain.Meme{}, err
+	}
 
-	return m, err
+	return m, nil
 }
 
 func (r *PostgresRepository) Delete(ID int) error {
