@@ -22,7 +22,6 @@ import (
 	usecase "meme-bot/internal/use_case"
 	"meme-bot/internal/util"
 
-	"github.com/go-faster/errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -42,7 +41,6 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	fileRemover := adapters.OSFileRemover{}
 
 	// --- DB ---
@@ -52,24 +50,28 @@ func main() {
 	}
 	repo := repository.NewPostgresRepository(pool)
 
-	// --- TELEGRAM BOT (moderation) ---
+	// --- TELEGRAM BOT ---
 	bot, err := tgbotapi.NewBotAPI(cfg.TG_BOT_TOKEN)
 	if err != nil {
-		log.Fatal(errors.Wrap(err, "failed to create bot api"))
+		log.Fatal(err)
 	}
 
-	// --- TELEGRAM CLIENT (meme's parsing) ---
+	// --- TELEGRAM CLIENT ---
 	if err := os.MkdirAll("tmp", 0755); err != nil {
-		log.Fatal(errors.Wrap(err, "failed to create tmp directory"))	
+		log.Fatal(err)
 	}
+
 	sessionStorage := &session.FileStorage{
 		Path: "tmp/session.json",
-		
 	}
+
 	tgClient := telegram.NewClient(cfg.TG_API_ID, cfg.TG_API_HASH, telegram.Options{
 		SessionStorage: sessionStorage,
 	})
-	
+
+	// --- CHANNELS ---
+	ingestionCh := make(chan struct{}, 1)
+
 	// --- PUBLISHERS ---
 	moderationPublisher := publisher.NewModerationPublisher(bot, cfg.MODERATION_CHAT_ID)
 	tgPublisher := publisher.NewTGPublisher(bot, cfg.TG_CHANNEL_ID)
@@ -80,23 +82,62 @@ func main() {
 	moderationUC := usecase.NewHandleModerationResultUseCase(repo, fileRemover)
 	publishUC := usecase.NewPublisherUseCase([]ports.Publisher{tgPublisher}, repo, logger, fileRemover)
 
-	// Init ingestion
-	logger.Info("Running ingestion...")
-	if err := runIngestion( tgClient, cfg, ingestionUC); err != nil {
-		logger.Error("ingestion failed", "err", err)
-	}
+	// --- TELEGRAM WORKER ---
+	go func() {
+		err := tgClient.Run(ctx, func(ctx context.Context) error {
+			// AUTH
+			flow := auth.NewFlow(
+				auth.Constant(
+					cfg.PHONE,
+					cfg.PASSWORD,
+					auth.CodeAuthenticatorFunc(func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
+						var code string
+						log.Print("Enter code: ")
+						_, err := fmt.Scanln(&code)
+						return code, err
+					}),
+				),
+				auth.SendCodeOptions{},
+			)
 
+			if err := tgClient.Auth().IfNecessary(ctx, flow); err != nil {
+				return err
+			}
+
+			logger.Info("Telegram client is ready")
+
+			// WORKER LOOP
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+
+				case <-ingestionCh:
+					logger.Info("Running ingestion...")
+
+					if err := ingestionUC.Call(ctx, 50); err != nil {
+						logger.Error("ingestion failed", "err", err)
+					}
+				}
+			}
+		})
+
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// --- SCHEDULER ---
 	scheduler := scheduler.NewCronScheduler()
-	logger.Info("Scheduler has been initialized...")
-	logger.Info("Current time: %v, UTC: %v\n", time.Now().String(), time.Now().Local)
 
 	if err := scheduler.RegisterJobs(
 		func() {
-			logger.Info("Running ingestion...")
+			logger.Info("Trigger ingestion...")
 
-			err := runIngestion( tgClient, cfg, ingestionUC)
-			if err != nil {
-				logger.Error("ingestion failed", "err", err)
+			select {
+			case ingestionCh <- struct{}{}:
+			default:
+				logger.Info("Ingestion already queued, skipping")
 			}
 		},
 		func() {
@@ -118,47 +159,17 @@ func main() {
 	}
 
 	scheduler.Start()
-	logger.Info("Scheduler has been started...")
-	
+	logger.Info("Scheduler started")
+
 	// --- HANDLERS ---
 	moderationHandler := delivery.NewModerationHandler(bot, moderationUC, sendToModerationUC, logger)
-
-	// --- TELEGRAM CALLBACK HANDLER ---
 	go moderationHandler.Start()
+
+	// --- INITIAL INGESTION ---
+	ingestionCh <- struct{}{}
 
 	// --- BLOCK MAIN ---
 	select {}
-}
-
-func runIngestion(
-	client *telegram.Client,
-	cfg *config.Config,
-	uc *usecase.IngestionUseCase,
-) error {
-	ctx := context.Background()
-
-	return client.Run(ctx, func(ctx context.Context) error {
-
-		flow := auth.NewFlow(
-			auth.Constant(
-				cfg.PHONE,
-				cfg.PASSWORD,
-				auth.CodeAuthenticatorFunc(func(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
-					var code string
-					log.Print("Enter code: ")
-					_, err := fmt.Scanln(&code)
-					return code, err
-				}),
-			),
-			auth.SendCodeOptions{},
-		)
-
-		if err := client.Auth().IfNecessary(ctx, flow); err != nil {
-			return err
-		}
-
-		return uc.Call(ctx, 20)
-	})
 }
 
 func createSources(
@@ -174,12 +185,21 @@ func createSources(
 	var sources []ports.Source
 
 	for _, src := range cfg.TG_SOURCES {
-		sources = append(sources,
-			source.NewTelegramSource(client, src, hasher, downloaderFactory, r))
+		sources = append(
+			sources,
+			source.NewTelegramSource(
+				client,
+				src,
+				hasher,
+				downloaderFactory,
+				r,
+			),
+		)
 	}
 
 	for _, src := range cfg.RSS_SOURCES {
-		sources = append(sources,
+		sources = append(
+			sources,
 			source.NewRssSource(
 				src,
 				feedParser,
@@ -187,7 +207,8 @@ func createSources(
 				r,
 				http.DefaultClient,
 				hasher,
-			))
+			),
+		)
 	}
 
 	return sources
