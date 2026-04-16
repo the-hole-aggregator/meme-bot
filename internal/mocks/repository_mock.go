@@ -25,6 +25,11 @@ func (m *RepositoryMock) ExistsByHash(hash string) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *RepositoryMock) ExistsBySourceID(sourceID string) (bool, error) {
+	args := m.Called(sourceID)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *RepositoryMock) GetByStatus(status domain.MemeStatus) ([]domain.Meme, error) {
 	args := m.Called(status)
 	return args.Get(0).([]domain.Meme), args.Error(1)

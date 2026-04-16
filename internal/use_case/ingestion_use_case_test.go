@@ -37,6 +37,7 @@ func TestIngestionUseCaseCallSuccess(t *testing.T) {
 
 	mockSource.On("FetchMeme", ctx).Return(meme, tempFile, nil).Once()
 	mockRepo.On("ExistsByHash", meme.PHash).Return(false, nil).Once()
+	mockRepo.On("ExistsBySourceID", meme.SourceID).Return(false, nil).Once()
 	mockRepo.On("Save", meme).Return(nil).Once()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

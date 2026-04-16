@@ -70,6 +70,15 @@ func (r *PostgresRepository) ExistsByHash(hash string) (bool, error) {
 	return exists, err
 }
 
+func (r *PostgresRepository) ExistsBySourceID(sourceID string) (bool, error) {
+	var exists bool
+
+	query := `SELECT EXISTS(SELECT 1 FROM memes WHERE source_id = $1)`
+
+	err := r.db.QueryRow(context.Background(), query, sourceID).Scan(&exists)
+	return exists, err
+}
+
 func (r *PostgresRepository) GetByStatus(status domain.MemeStatus) ([]domain.Meme, error) {
 	query := `
 		SELECT id, phash, status, source, source_id, created_at

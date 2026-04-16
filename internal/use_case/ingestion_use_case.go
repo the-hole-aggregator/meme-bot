@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-const maxAttempts = 50
+const maxAttempts = 100
 
 type IngestionUseCase struct {
 	repository  ports.Repository
@@ -52,9 +52,25 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 			continue
 		}
 
-		if !uc.validate(meme, filePath) {
-			err := uc.fileRemover.Remove(filePath)
-			if err != nil {
+		if uc.existsBySourceID(meme) {
+			uc.logger.Info("Exists by sourceID ", "meme", meme)
+
+			continue
+		}
+
+		if uc.existsByHash(meme) {
+			uc.logger.Info("Exists by hash ", "meme", meme)
+
+			if err := uc.fileRemover.Remove(filePath); err != nil {
+				uc.logger.Error("failed on removing image file")
+			}
+
+			continue
+		}
+
+		if !uc.validate(filePath) {
+			uc.logger.Info("ingestion validation failed for ", "meme", meme)
+			if err := uc.fileRemover.Remove(filePath); err != nil {
 				uc.logger.Error("failed on removing image file")
 			}
 
@@ -85,7 +101,7 @@ func (uc *IngestionUseCase) Call(ctx context.Context, limit int) error {
 	return nil
 }
 
-func (uc *IngestionUseCase) validate(meme *domain.Meme, filePath string) bool {
+func (uc *IngestionUseCase) validate(filePath string) bool {
 	if !isValidImage(filePath, uc.logger) {
 		uc.logger.Error("image isn't valid")
 		return false
@@ -96,13 +112,27 @@ func (uc *IngestionUseCase) validate(meme *domain.Meme, filePath string) bool {
 		return false
 	}
 
+	return true
+}
+
+func (uc *IngestionUseCase) existsBySourceID(meme *domain.Meme) bool {
+	exists, err := uc.repository.ExistsBySourceID(meme.SourceID)
+	if err != nil {
+		uc.logger.Error(fmt.Errorf("failed on checking existence by sourceID: %s", err).Error())
+		return false
+	}
+
+	return exists
+}
+
+func (uc *IngestionUseCase) existsByHash(meme *domain.Meme) bool {
 	exists, err := uc.repository.ExistsByHash(meme.PHash)
 	if err != nil {
 		uc.logger.Error(fmt.Errorf("failed on checking existence by phash: %s", err).Error())
 		return false
 	}
 
-	return !exists
+	return exists
 }
 
 func isValidImage(path string, logger *slog.Logger) bool {

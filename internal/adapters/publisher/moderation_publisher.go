@@ -21,7 +21,7 @@ func (p *ModerationPublisher) Publish(meme domain.Meme) error {
 
 	msg := tgbotapi.NewPhoto(p.chatID, file)
 
-	msg.Caption = fmt.Sprintf("ID: %d", meme.ID)
+	msg.Caption = fmt.Sprintf("ID: %d SourceID: %v", meme.ID, meme.SourceID)
 
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(

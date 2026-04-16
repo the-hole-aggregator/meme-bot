@@ -42,7 +42,7 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	fileRemover := adapters.OSFileRemover{}
+	fileRemover := adapters.NewOsFileRemover(logger)
 
 	// --- DB ---
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))

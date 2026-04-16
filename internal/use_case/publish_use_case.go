@@ -42,10 +42,6 @@ func (uc *PublishUseCase) Call() error {
 		}
 	}
 
-	if err := uc.repo.Delete(meme.ID); err != nil {
-		return err
-	}
-
 	if err := uc.fileRemover.Remove(fmt.Sprintf("tmp/%s.jpg", meme.SourceID)); err != nil {
 		return err
 	}
